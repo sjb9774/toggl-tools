@@ -117,7 +117,10 @@ def get_timer_info(timer_id):
     return r.json()
     
 def clear_config():
-    sh.git('config', '--remove-section', get_branch_name())
+    try:
+        sh.git('config', '--remove-section', get_branch_name())
+    except:
+        pass
     
 def delete_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}".format(time_entry_id=timer_id)
@@ -210,7 +213,7 @@ if __name__ == "__main__":
         w_id = get_config('wid')
         
         billable = get_config('billable')
-        billable = billable.lower() == "true"
+        billable = billable and billable.lower() == "true"
         
         timer_response = start_timer(name=entry, 
                                      project_id=p_id, 
