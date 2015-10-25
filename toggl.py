@@ -97,7 +97,7 @@ def get_workspaces():
     else:
         url = "https://www.toggl.com/api/v8/workspaces"
         r = requests.get(url, auth=(get_api_token(), 'api_token'))
-        write_config('workspaces', r.json())
+        set_config('workspaces', r.json())
         return r.json()
 
 def get_project_tasks(pid):
@@ -139,7 +139,7 @@ def get_duration_string(seconds):
 
 def stop_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}/stop".format(time_entry_id=timer_id)
-    r = requests.put(url, auth=(token, 'api_token'))
+    r = requests.put(url, auth=(get_api_token(), 'api_token'))
     return r.json()
     
 def start_timer(name="", 
@@ -175,97 +175,104 @@ def start_timer(name="",
         r = requests.post(url, json=payload, auth=auth)
         return r.json()
             
+def current_timer_command(*args, **kwargs):
+    current_timer = get_current_timer()
+    if current_timer['data']:
+        print "Current timer is '{timer}'.".format(timer=current_timer['data']['description'])
+        dur_str = get_duration_string(current_timer['data']['duration'] + int(time.time()))
+        print "Current duration: {dur_str}".format(dur_str=dur_str)
+        if current_timer['data']['tags']:
+            print 'Tags: {tags}\t\t'.format(tags=', '.join(current_timer['data']['tags']))
+        if current_timer['data']['pid']:
+            print "Project: {project_name}".format(project_name=get_project_by(id=current_timer['data']['pid'])['name'])
+        print "Billable: {billable}".format(billable=current_timer['data']['billable'])
+    else:
+        print "No timer currently running."
+        
+def start_command(entry='', delete=False, **kwargs):
+    if delete:
+        current = get_current_timer()
+        if current['data']:
+            stop_timer(current['data']['id'])
+            print "Deleting current timer '{timer}'.".format(timer=current['data']['description'])
+            resp = delete_timer(current['data']['id'])
+            if resp:
+                deets = get_timer_info(resp[0])
+                print "Deleted timer '{timer}'.".format(timer=deets['data']['description'])
+                print "Total duration: {dur_str}".format(dur_str=get_duration_string(deets['data']['duration']))
+        else:
+            print "No timer currently running, can't delete. Starting new timer."
+    # toggl_setup.py sets up the config with useful values as desired by the user,
+    # here is where we fetch the information and use it for the entry description
+    p_id = get_config('pid')
+    if not p_id:
+        project_name = get_config('project')
+        if project_name:
+            p_id = get_project_by_name(project_name)['id']
+        
+    tags = get_config('tags', get_all=True)
+    if tags:
+        tags = tags.split('\n')
+        
+    t_id = get_config('tid')
+    if not t_id:
+        task = get_config('task')
+        if task:
+            task_id = get_task_by_name(project_name, task)['id']
+    w_id = get_config('wid')
+    # gotta have at least one of these or the request will fail,
+    # get the workspace as a last resort to avoid the extra request
+    if not w_id and not t_id and not p_id:
+        w_id = get_workspaces()[0]['data']['id']  
+          
+    billable = get_config('billable')
+    billable = billable and billable.lower() == "true"
+    
+    timer_response = start_timer(name=entry, 
+                                 project_id=p_id, 
+                                 task_id=t_id, 
+                                 tags=tags, 
+                                 workspace_id=w_id, 
+                                 billable=billable)
+    if timer_response['data']:
+        print "Tracking '{entry}'.".format(entry=entry)
+    else:
+        print "Unknown problem starting the timer."
+        
+def stop_command(*args, **kwargs):
+    current_timer = get_current_timer()
+    if current_timer['data']:
+        data = stop_timer(current_timer['data']['id'])['data']
+        if data:
+            print "Successfully stopped '{timer_name}' timer.".format(timer_name=data.get('description', ''))
+            duration = data.get('duration', 0)
+            dur_str = get_duration_string(duration)
+            print "Duration: {duration}".format(duration=dur_str)
+            if kwargs.get('delete'):
+                delete_timer(current_timer['data']['id'])
+                print "Deleted timer '{timer}'.".format(timer=data.get('description', ''))
+        else:
+            print "Couldn't stop the running timer! v(o_o)v"
+            
+    else:
+        print "No timer currently running."
+    
 if __name__ == "__main__":
     p = ArgumentParser(description="Starts or stops your toggl timer.")
-    p.add_argument("command", action="store", help="'start' or 'stop' to start or stop a timer, 'current-timer' for information about the timer currently active, if any.")
+    p_subs = p.add_subparsers()
+    start_parser = p_subs.add_parser("start", help="Start a timer based on your current configuration.")
+    start_parser.set_defaults(func=start_command)
+    stop_parser = p_subs.add_parser("stop", help="Stop the current timer.")
+    stop_parser.set_defaults(func=stop_command)
+    current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer")
+    current_parser.set_defaults(func=current_timer_command)
+    # p.add_argument("command", action="store", help="'start' or 'stop' to start or stop a timer, 'current-timer' for information about the timer currently active, if any.")
     p.add_argument("--name", action="store", help="Use a different entry name than what is set up in the config.")
     p.add_argument("--delete", action="store_true", help="Deletes the current entry if passed with 'start', or deletes the stopped entry.")
     
     args = p.parse_args()
+    nice_args = list(args._get_args())
+    nice_kwargs = dict(args._get_kwargs())
     entry = args.name if args.name else get_config('entry')
-    token = get_api_token()
-    
-    if args.command.lower() == "start":
-        if args.delete:
-            current = get_current_timer()
-            if current['data']:
-                stop_timer(current['data']['id'])
-                print "Deleting current timer '{timer}'.".format(timer=current['data']['description'])
-                resp = delete_timer(current['data']['id'])
-                if resp:
-                    deets = get_timer_info(resp[0])
-                    print "Deleted timer '{timer}'.".format(timer=deets['data']['description'])
-                    print "Total duration: {dur_str}".format(dur_str=get_duration_string(deets['data']['duration']))
-            else:
-                print "No timer currently running, can't delete. Starting new timer."
-        # toggl_setup.py sets up the config with useful values as desired by the user,
-        # here is where we fetch the information and use it for the entry description
-        p_id = get_config('pid')
-        if not p_id:
-            project_name = get_config('project')
-            if project_name:
-                p_id = get_project_by_name(project_name)['id']
-            
-        tags = get_config('tags', get_all=True)
-        if tags:
-            tags = tags.split('\n')
-            
-        t_id = get_config('tid')
-        if not t_id:
-            task = get_config('task')
-            if task:
-                task_id = get_task_by_name(project_name, task)['id']
-        w_id = get_config('wid')
-        # gotta have at least one of these or the request will fail,
-        # get the workspace as a last resort to avoid the extra request
-        if not w_id and not t_id and not p_id:
-            w_id = get_workspaces()[0]['data']['id']  
-              
-        billable = get_config('billable')
-        billable = billable and billable.lower() == "true"
-        
-        timer_response = start_timer(name=entry, 
-                                     project_id=p_id, 
-                                     task_id=t_id, 
-                                     tags=tags, 
-                                     workspace_id=w_id, 
-                                     billable=billable)
-        if timer_response['data']:
-            print "Tracking '{entry}'.".format(entry=entry)
-        else:
-            print "Unknown problem starting the timer."
-            
-    elif args.command.lower() == "stop":
-        current_timer = get_current_timer()
-        
-        if current_timer['data']:
-            data = stop_timer(current_timer['data']['id'])['data']
-            if data:
-                print "Successfully stopped '{timer_name}' timer.".format(timer_name=data.get('description', ''))
-                duration = data.get('duration', 0)
-                dur_str = get_duration_string(duration)
-                print "Duration: {duration}".format(duration=dur_str)
-                if args.delete:
-                    delete_timer(current_timer['data']['id'])
-                    print "Deleted timer '{timer}'.".format(timer=data['description'])
-            else:
-                print "Couldn't stop the running timer! v(o_o)v"
-                
-        else:
-            print "No timer currently running."
-    elif args.command.lower() == "current-timer":
-        current_timer = get_current_timer()
-        if current_timer['data']:
-            print "Current timer is '{timer}'.".format(timer=current_timer['data']['description'])
-            dur_str = get_duration_string(current_timer['data']['duration'] + int(time.time()))
-            print "Current duration: {dur_str}".format(dur_str=dur_str)
-            if current_timer['data']['tags']:
-                print 'Tags: {tags}\t\t'.format(tags=', '.join(current_timer['data']['tags']))
-            if current_timer['data']['pid']:
-                print "Project: {project_name}".format(project_name=get_project_by(id=current_timer['data']['pid'])['name'])
-            print "Billable: {billable}".format(billable=current_timer['data']['billable'])
-        else:
-            print "No timer currently running."
-            
-    else:
-        print "{} is not 'start', 'current-timer', or 'stop'.".format(args.command)
+    nice_kwargs['entry'] = entry
+    args.func(*nice_args, **nice_kwargs)
