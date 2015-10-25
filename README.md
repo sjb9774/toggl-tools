@@ -2,10 +2,19 @@
 Toggl API command-line tools already exist, but to my knowledge this is the first that leverages
 the power of `git` to allow you to much more easily track time you spend programming.
 
+## Requirements
+This project uses the following libraries:
+* [requests](http://docs.python-requests.org/en/latest/)
+* [sh](https://amoffat.github.io/sh/)
+
 ## Getting started
-The first thing you'll want to do is go to your Toggl profile and get your API token. 
-You'll be prompted for it when you first run `toggl-setup` (you can also reset it at any
-time by running `toggl-setup --set-token`).
+
+First, clone this repo wherever you like on your machine. Then, create aliases `toggl` and
+`toggl-setup` that refer to your particular installation locations.
+
+After cloning, the first thing you'll want to do is go to your Toggl profile and get your 
+API token. You'll be prompted for it when you first run `toggl-setup` (you can also reset 
+it at any time by running `toggl-setup --set-token`).
 
 I believe the easiest way to get started is to go to the toggl website each time you start
 a new branch, create the appropriate timer you desire for the branch and start it. Then,
@@ -31,7 +40,7 @@ I would consider a minimum viable product, these things need to be changed/imple
 and this tool should simply be a pleasant means of interfacing with them.
 - [ ] Exceptions need to be handled gracefully.
   - [ ] Failed requests need to return useful messages to the user.
-- [ ] There must be adequate test coverage.
+- [ ] There must be adequate test coverage.atom
 - [ ] README needs to be up-to-date with all the above changes.
 
 Once these MVP goals are met, luxury functionality can begin to be planned.
