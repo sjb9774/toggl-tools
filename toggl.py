@@ -91,9 +91,14 @@ def get_project_by(_refresh=True, **kwargs):
     return None
         
 def get_workspaces():
-    url = "https://www.toggl.com/api/v8/workspaces"
-    r = requests.get(url, auth=(get_api_token(), 'api_token'))
-    return r.json()
+    data = read_data()
+    if data.get('workspaces'):
+        return data.get('workspaces')
+    else:
+        url = "https://www.toggl.com/api/v8/workspaces"
+        r = requests.get(url, auth=(get_api_token(), 'api_token'))
+        write_config('workspaces', r.json())
+        return r.json()
 
 def get_project_tasks(pid):
     url = "https://www.toggl.com/api/v8/projects/{project_id}/tasks".format(project_id=pid)
@@ -211,7 +216,11 @@ if __name__ == "__main__":
             if task:
                 task_id = get_task_by_name(project_name, task)['id']
         w_id = get_config('wid')
-        
+        # gotta have at least one of these or the request will fail,
+        # get the workspace as a last resort to avoid the extra request
+        if not w_id and not t_id and not p_id:
+            w_id = get_workspaces()[0]['data']['id']  
+              
         billable = get_config('billable')
         billable = billable and billable.lower() == "true"
         
@@ -233,14 +242,12 @@ if __name__ == "__main__":
             data = stop_timer(current_timer['data']['id'])['data']
             if data:
                 print "Successfully stopped '{timer_name}' timer.".format(timer_name=data.get('description', ''))
-                
                 duration = data.get('duration', 0)
                 dur_str = get_duration_string(duration)
                 print "Duration: {duration}".format(duration=dur_str)
                 if args.delete:
                     delete_timer(current_timer['data']['id'])
                     print "Deleted timer '{timer}'.".format(timer=data['description'])
-                    
             else:
                 print "Couldn't stop the running timer! v(o_o)v"
                 
