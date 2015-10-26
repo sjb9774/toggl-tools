@@ -268,7 +268,8 @@ if __name__ == "__main__":
     current_parser.set_defaults(func=current_timer_command)
     # p.add_argument("command", action="store", help="'start' or 'stop' to start or stop a timer, 'current-timer' for information about the timer currently active, if any.")
     p.add_argument("--name", action="store", help="Use a different entry name than what is set up in the config.")
-    p.add_argument("--delete", action="store_true", help="Deletes the current entry if passed with 'start', or deletes the stopped entry.")
+    stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
+    start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
     
     args = p.parse_args()
     nice_args = list(args._get_args())
