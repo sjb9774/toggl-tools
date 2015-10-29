@@ -21,9 +21,6 @@ def config():
 def get_branch_name():
     return sh.git('rev-parse', '--abbrev-ref', 'HEAD').strip('\n').replace('_', '-')
     
-def get_section():
-    return get_branch_name()
-
 def set_config(section, key, value, _list=False):
     cfg = config()
     if not cfg.has_section(section):
