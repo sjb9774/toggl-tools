@@ -6,14 +6,30 @@ import sh
 import json
 from requests.auth import HTTPBasicAuth
 import time
+from ConfigParser import ConfigParser
 
+def config_path():
+    import os
+    
+    return os.path.expanduser('~/.toggl/toggl.cfg')
+    
+def config():
+    cfg = ConfigParser()
+    cfg.read(config_path())
+    return cfg
+    
 def get_branch_name():
     return sh.git('rev-parse', '--abbrev-ref', 'HEAD').strip('\n').replace('_', '-')
-
-def set_config(key, value):
-    branch_name = get_branch_name()
-    command = ['config', '--add', '{branch}.{key}'.format(branch=branch_name, key=key), value]
-    sh.git(*command)
+    
+def set_config(section, key, value, _list=False):
+    cfg = config()
+    if not cfg.has_section(section):
+        cfg.add_section(section)
+    if _list:
+        cfg.set(section, key, '::'.join(value))
+    else:
+        cfg.set(section, key, value)
+    cfg.write(open(config_path(), 'r+'))
 
 def write_data(section, write_this):
     current_data = read_data()
@@ -35,20 +51,24 @@ def read_data():
     else:
         return {}
 
-def get_config(key, get_all=False, dtype=''):
-    branch_name = get_branch_name()
-    command = ['config', '--get{all}'.format(all="-all" if get_all else ''), '{branch}.{key}'.format(branch=branch_name.replace('_', '-'), key=key)]
-    if dtype:
-        command.append('--{dtype}'.format(dtype=dtype))
-    try:
-        return sh.git(*command).strip('\n')
-    except:
+def get_config(section, key, get_all=False, _list=False):
+    cfg = config()
+    if cfg.has_option(section, key):
+        if _list:
+            return cfg.get(section, key).split('::')
+        else:
+            return cfg.get(section, key)
+    else:
         return None
 
 def get_api_token():
-    branch_name = get_branch_name()
-    command = ['config', '--get', 'toggl.api-token']
-    return sh.git(*command).strip('\n')
+    return config().get('global', 'api_token')
+
+def get_section_from_name(name):
+    cfg = config()
+    for section in cfg.sections():
+        if cfg.has_option(section, 'entry_name') and cfg.get(section, 'entry_name', name) == name:
+            return section
     
 def get_projects(workspace):
     w_id = workspace['id']
@@ -121,11 +141,13 @@ def get_timer_info(timer_id):
     r = requests.get(url, auth=(get_api_token(), 'api_token'))
     return r.json()
     
-def clear_config():
-    try:
-        sh.git('config', '--remove-section', get_branch_name())
-    except:
-        pass
+def clear_config(section=None):
+    cfg = config()
+    if section:
+        cfg.remove_section(section)
+    else:
+        for section in cfg.sections():
+            cfg.remove_section(section)
     
 def delete_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}".format(time_entry_id=timer_id)
@@ -189,7 +211,19 @@ def current_timer_command(*args, **kwargs):
     else:
         print "No timer currently running."
         
-def start_command(entry='', delete=False, **kwargs):
+def start_command(delete=False, **kwargs):
+    section = kwargs.get('config_section')
+    config_section = get_config('global', 'previous') if kwargs.get('previous') else section
+    if not config_section:
+        if kwargs.get('previous'):
+            print "No previous timer found! Start a timer first."
+        else:
+            print "Must provide a configuration to use or pass the '--previous' flag."
+        import sys; sys.exit(1)
+    
+    # set up the "previous" timer in the config
+    set_config('global', 'previous', config_section)
+    
     if delete:
         current = get_current_timer()
         if current['data']:
@@ -204,28 +238,27 @@ def start_command(entry='', delete=False, **kwargs):
             print "No timer currently running, can't delete. Starting new timer."
     # toggl_setup.py sets up the config with useful values as desired by the user,
     # here is where we fetch the information and use it for the entry description
-    p_id = get_config('pid')
+    entry = get_config(config_section, "entry")
+    p_id = get_config(config_section, 'pid')
     if not p_id:
-        project_name = get_config('project')
+        project_name = get_config(config_section, 'project')
         if project_name:
             p_id = get_project_by_name(project_name)['id']
         
-    tags = get_config('tags', get_all=True)
-    if tags:
-        tags = tags.split('\n')
+    tags = get_config(config_section, 'tags', _list=True)
         
-    t_id = get_config('tid')
+    t_id = get_config(config_section, 'tid')
     if not t_id:
-        task = get_config('task')
+        task = get_config(config_section, 'task')
         if task:
             task_id = get_task_by_name(project_name, task)['id']
-    w_id = get_config('wid')
+    w_id = get_config(config_section, 'wid')
     # gotta have at least one of these or the request will fail,
     # get the workspace as a last resort to avoid the extra request
     if not w_id and not t_id and not p_id:
         w_id = get_workspaces()[0]['data']['id']  
           
-    billable = get_config('billable')
+    billable = get_config(config_section, 'billable')
     billable = billable and billable.lower() == "true"
     
     timer_response = start_timer(name=entry, 
@@ -264,16 +297,17 @@ if __name__ == "__main__":
     start_parser.set_defaults(func=start_command)
     stop_parser = p_subs.add_parser("stop", help="Stop the current timer.")
     stop_parser.set_defaults(func=stop_command)
-    current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer")
+    current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer.")
     current_parser.set_defaults(func=current_timer_command)
-    # p.add_argument("command", action="store", help="'start' or 'stop' to start or stop a timer, 'current-timer' for information about the timer currently active, if any.")
-    p.add_argument("--name", action="store", help="Use a different entry name than what is set up in the config.")
+    
     stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
+    start_parser.add_argument("config_section", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
     start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
+    start_parser.add_argument("--previous", action="store_true", help="Start the same timer as was last started.")
     
     args = p.parse_args()
+    
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
-    entry = args.name if args.name else get_config('entry')
-    nice_kwargs['entry'] = entry
+    
     args.func(*nice_args, **nice_kwargs)
