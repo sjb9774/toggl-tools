@@ -289,8 +289,9 @@ def stop_command(*args, **kwargs):
             
     else:
         print "No timer currently running."
+        
     
-if __name__ == "__main__":
+def do_argparse():
     p = ArgumentParser(description="Starts or stops your toggl timer.")
     p_subs = p.add_subparsers()
     start_parser = p_subs.add_parser("start", help="Start a timer based on your current configuration.")
@@ -309,5 +310,8 @@ if __name__ == "__main__":
     
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
+    return args, kwargs
     
-    args.func(*nice_args, **nice_kwargs)
+if __name__ == "__main__":
+    args, kwargs = do_argparse()
+    kwargs.get('func')(*args, **kwargs)
