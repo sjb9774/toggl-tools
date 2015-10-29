@@ -28,7 +28,7 @@ automatically when you switch between branches*.
 If you don't want to have to touch the toggl website again, just run `toggl-setup --help`
 and review the help options for how to manually configure a timer from the command line. An 
 example command might look like 
-`toggl-setup "big project" --entry-name "My Big Project" --project "Hackathon" --tags "important" "python" --billable`
+`toggl-setup "big project" --entry-name "My Big Project" --project "Hackathon" --tags "important" "python" --billable` and then you can start that timer later with `toggl start "big project"`.
 
 ## MVP
 Right now toggl-tools works but has some (a lot) of rough edges. In order to create a what 
