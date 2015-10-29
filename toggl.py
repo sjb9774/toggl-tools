@@ -10,7 +10,6 @@ from ConfigParser import ConfigParser
 
 def config_path():
     import os
-    
     return os.path.expanduser('~/.toggl/toggl.cfg')
     
 def config():
@@ -290,6 +289,19 @@ def stop_command(*args, **kwargs):
     else:
         print "No timer currently running."
         
+def describe_command(*args, **kwargs):
+    config_section = kwargs.get('reference')
+    if not config_section and kwargs.get('previous'):
+        config_section = get_config('global', 'previous')
+    elif not config_section:
+        print "Must either provide a timer reference name or pass '--previous'."
+    cfg = config().items(config_section) if config().has_section(config_section) else None
+    if config_section and cfg:
+        for option, value in cfg:
+            print "{opt}: {val}".format(opt=option.capitalize(), val=value.replace('::', ', '))
+    else:
+        print "No timer configuration under '{ref}'.".format(ref=config_section)
+        
     
 def do_argparse():
     p = ArgumentParser(description="Starts or stops your toggl timer.")
@@ -298,10 +310,13 @@ def do_argparse():
     start_parser.set_defaults(func=start_command)
     stop_parser = p_subs.add_parser("stop", help="Stop the current timer.")
     stop_parser.set_defaults(func=stop_command)
+    stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
     current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer.")
     current_parser.set_defaults(func=current_timer_command)
-    
-    stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
+    describe_parser = p_subs.add_parser("describe", help="Outputs the configuration for the given timer.")
+    describe_parser.add_argument('reference', nargs='?', action="store", help="The name under which the desired configuration was saved.")
+    describe_parser.add_argument('--previous', action="store_true", help="Describe the previously run timer.")
+    describe_parser.set_defaults(func=describe_command)
     start_parser.add_argument("config_section", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
     start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
     start_parser.add_argument("--previous", action="store_true", help="Start the same timer as was last started.")
@@ -310,7 +325,7 @@ def do_argparse():
     
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
-    return args, kwargs
+    return nice_args, nice_kwargs
     
 if __name__ == "__main__":
     args, kwargs = do_argparse()
