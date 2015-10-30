@@ -36,8 +36,10 @@ if __name__ == "__main__":
         open(config_path(), 'a').close()
     section = args.config_key
     name = args.entry_name if args.entry_name else args.config_key
-    
-    # we're gonna use git configs by branch-name to keep track of all of this
+    forbidden_names = ('previous', 'current')
+    if name.lower() in forbidden_names:
+        print "Name can't be any of {names}".format(names=', '.join(forbidden_names))
+        import sys; sys.exit(1)
     
     if is_first_time() or args.set_token:
         token = None
