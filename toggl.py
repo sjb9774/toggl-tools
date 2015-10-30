@@ -211,7 +211,7 @@ def current_timer_command(*args, **kwargs):
         print "No timer currently running."
         
 def start_command(delete=False, **kwargs):
-    section = kwargs.get('config_section')
+    section = kwargs.get('name')
     config_section = get_config('global', 'previous') if kwargs.get('previous') else section
     if not config_section:
         if kwargs.get('previous'):
@@ -290,18 +290,34 @@ def stop_command(*args, **kwargs):
         print "No timer currently running."
         
 def describe_command(*args, **kwargs):
-    config_section = kwargs.get('reference')
-    if not config_section and kwargs.get('previous'):
-        config_section = get_config('global', 'previous')
+    config_section = kwargs.get('name')
+    if not config_section:
+        if kwargs.get('previous'):
+            config_section = get_config('global', 'previous')
+        elif kwargs.get('current'):
+            current = get_current_timer()
+            if current.get('data'):
+                for key, value in current.get('data').iteritems():
+                    _list = type(value) == list
+                    if key == "duration":
+                        import time
+                        value += time.time()
+                        value = get_duration_string(value)
+                    set_config('current', key, value, _list=_list)
+                describe('current')
+            else:
+                print "No timer currently running."
     elif not config_section:
         print "Must either provide a timer reference name or pass '--previous'."
-    cfg = config().items(config_section) if config().has_section(config_section) else None
-    if config_section and cfg:
-        for option, value in cfg:
-            print "{opt}: {val}".format(opt=option.capitalize(), val=value.replace('::', ', '))
-    else:
+    if config_section and config().has_section(config_section):
+        describe(config_section)
+    elif config_section:
         print "No timer configuration under '{ref}'.".format(ref=config_section)
-        
+
+def describe(section):
+    items = config().items(section)
+    for option, value in items:
+        print "{opt}: {val}".format(opt=option.capitalize(), val=value.replace('::', ', '))
     
 def do_argparse():
     p = ArgumentParser(description="Starts or stops your toggl timer.")
@@ -314,17 +330,21 @@ def do_argparse():
     current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer.")
     current_parser.set_defaults(func=current_timer_command)
     describe_parser = p_subs.add_parser("describe", help="Outputs the configuration for the given timer.")
-    describe_parser.add_argument('reference', nargs='?', action="store", help="The name under which the desired configuration was saved.")
-    describe_parser.add_argument('--previous', action="store_true", help="Describe the previously run timer.")
+    describe_parser.add_argument('name', nargs='?', action="store", help="The name under which the desired configuration was saved.")
     describe_parser.set_defaults(func=describe_command)
-    start_parser.add_argument("config_section", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
+    start_parser.add_argument("name", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
     start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
-    start_parser.add_argument("--previous", action="store_true", help="Start the same timer as was last started.")
     
     args = p.parse_args()
     
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
+    if nice_kwargs.get('name') == "previous":
+        nice_kwargs['previous'] = True
+        del nice_kwargs['name']
+    elif nice_kwargs.get('name') == 'current':
+        nice_kwargs['current'] = True
+        del nice_kwargs['name']
     return nice_args, nice_kwargs
     
 if __name__ == "__main__":
