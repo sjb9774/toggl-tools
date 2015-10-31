@@ -1,6 +1,6 @@
 # toggl-tools
 Toggl API command-line tools already exist, but to my knowledge this is the first that leverages
-the power of `git`* to allow you to much more easily track time you spend programming.
+the power of `git` to allow you to much more easily track time you spend programming.
 
 
 
@@ -30,6 +30,12 @@ and review the help options for how to manually configure a timer from the comma
 example command might look like 
 `toggl-setup "big project" --entry-name "My Big Project" --project "Hackathon" --tags "important" "python" --billable` and then you can start that timer later with `toggl start "big project"`.
 
+Your `git` branch can be leveraged easily by running a command by using the special keyword `this`, 
+like `toggl-setup this --current-timer` which will configure a timer associated with this 
+branch based on the currently running timer. You can run the timer associated with the 
+current branch by running `toggl start this`! This is a commonly used command that is best 
+aliased to something shorter like `track`.
+
 ## MVP
 Right now toggl-tools works but has some (a lot) of rough edges. In order to create a what 
 I would consider a minimum viable product, these things need to be changed/implemented:
@@ -46,6 +52,3 @@ and this tool should simply be a pleasant means of interfacing with them.
 - [ ] README needs to be up-to-date with all the above changes.
 
 Once these MVP goals are met, luxury functionality can begin to be planned.
-
-*(The current master release doesn't actually leverage `git` at all anymore! That will be
-reimplemented in a later release.)

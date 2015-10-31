@@ -299,13 +299,15 @@ def describe_command(*args, **kwargs):
                     value += time.time()
                     value = get_duration_string(value)
                 set_config('current', key, value, _list=_list)
-            describe('current')
+            config_section = "current"
         else:
             print "No timer currently running."
+            import sys; sys.exit(0)
     elif kwargs.get('this'):
         config_section = get_branch_name()
     elif not config_section:
         print "Must provide a timer reference."
+
     if config_section and config().has_section(config_section):
         describe(config_section)
     elif config_section:
