@@ -7,6 +7,7 @@ import json
 from requests.auth import HTTPBasicAuth
 import time
 from ConfigParser import ConfigParser
+requests.packages.urllib3.disable_warnings()
 
 def config_path():
     import os
@@ -116,7 +117,6 @@ def get_workspaces():
     else:
         url = "https://www.toggl.com/api/v8/workspaces"
         r = requests.get(url, auth=(get_api_token(), 'api_token'))
-        set_config('workspaces', r.json())
         return r.json()
 
 def get_project_tasks(pid):
@@ -156,7 +156,7 @@ def delete_timer(timer_id):
 def get_duration_string(seconds):
     mins, sec = divmod(seconds, 60)
     hrs, mins = divmod(mins, 60)
-    return "{hrs} hours, {mins} minutes, {secs} seconds.".format(hrs=hrs, mins=mins, secs=sec)
+    return "{hrs} hours, {mins} minutes, {secs} seconds.".format(hrs=int(hrs), mins=int(mins), secs=int(sec))
 
 def stop_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}/stop".format(time_entry_id=timer_id)
@@ -195,29 +195,20 @@ def start_timer(name="",
         url = "https://www.toggl.com/api/v8/time_entries/start"
         r = requests.post(url, json=payload, auth=auth)
         return r.json()
-            
-def current_timer_command(*args, **kwargs):
-    current_timer = get_current_timer()
-    if current_timer['data']:
-        print "Current timer is '{timer}'.".format(timer=current_timer['data']['description'])
-        dur_str = get_duration_string(current_timer['data']['duration'] + int(time.time()))
-        print "Current duration: {dur_str}".format(dur_str=dur_str)
-        if current_timer['data']['tags']:
-            print 'Tags: {tags}\t\t'.format(tags=', '.join(current_timer['data']['tags']))
-        if current_timer['data']['pid']:
-            print "Project: {project_name}".format(project_name=get_project_by(id=current_timer['data']['pid'])['name'])
-        print "Billable: {billable}".format(billable=current_timer['data']['billable'])
-    else:
-        print "No timer currently running."
-        
+                    
 def start_command(delete=False, **kwargs):
     section = kwargs.get('name')
-    config_section = get_config('global', 'previous') if kwargs.get('previous') else section
+    for keyword in ('current', 'previous'):
+        if kwargs.get(keyword):
+            config_section = get_config('global', keyword) if config().has_option('global', keyword) else keyword
+            break
+    else:
+        config_section = kwargs.get('name')
     if not config_section:
         if kwargs.get('previous'):
             print "No previous timer found! Start a timer first."
         else:
-            print "Must provide a configuration to use or pass the '--previous' flag."
+            print "Must provide a configuration to use."
         import sys; sys.exit(1)
     
     # set up the "previous" timer in the config
@@ -308,7 +299,7 @@ def describe_command(*args, **kwargs):
             else:
                 print "No timer currently running."
     elif not config_section:
-        print "Must either provide a timer reference name or pass '--previous'."
+        print "Must either provide a timer reference."
     if config_section and config().has_section(config_section):
         describe(config_section)
     elif config_section:
@@ -327,8 +318,6 @@ def do_argparse():
     stop_parser = p_subs.add_parser("stop", help="Stop the current timer.")
     stop_parser.set_defaults(func=stop_command)
     stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
-    current_parser = p_subs.add_parser("current-timer", help="Command for the currently running timer.")
-    current_parser.set_defaults(func=current_timer_command)
     describe_parser = p_subs.add_parser("describe", help="Outputs the configuration for the given timer.")
     describe_parser.add_argument('name', nargs='?', action="store", help="The name under which the desired configuration was saved.")
     describe_parser.set_defaults(func=describe_command)
