@@ -34,9 +34,9 @@ if __name__ == "__main__":
         os.mkdir(os.path.expanduser('~/.toggl'))
     if not os.path.exists(config_path()):
         open(config_path(), 'a').close()
-    section = args.config_key
-    name = args.entry_name if args.entry_name else args.config_key
-    forbidden_names = ('previous', 'current')
+    section = get_branch_name() if args.config_key == "this" else args.config_key
+    name = args.entry_name if args.entry_name else section
+    forbidden_names = ('previous', 'current', 'this')
     if name.lower() in forbidden_names:
         print "Name can't be any of {names}".format(names=', '.join(forbidden_names))
         import sys; sys.exit(1)

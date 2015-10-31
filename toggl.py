@@ -198,9 +198,14 @@ def start_timer(name="",
                     
 def start_command(delete=False, **kwargs):
     section = kwargs.get('name')
-    for keyword in ('current', 'previous'):
+    for keyword in ('current', 'previous', 'this'):
         if kwargs.get(keyword):
-            config_section = get_config('global', keyword) if config().has_option('global', keyword) else keyword
+            if keyword == "current":
+                config_section = "current"
+            elif keyword == "previous":
+                config_section = get_config('global', 'previous') if config().has_option('global', 'previous') else None
+            elif keyword == "this":
+                config_section = get_branch_name()
             break
     else:
         config_section = kwargs.get('name')
@@ -282,32 +287,34 @@ def stop_command(*args, **kwargs):
         
 def describe_command(*args, **kwargs):
     config_section = kwargs.get('name')
-    if not config_section:
-        if kwargs.get('previous'):
-            config_section = get_config('global', 'previous')
-        elif kwargs.get('current'):
-            current = get_current_timer()
-            if current.get('data'):
-                for key, value in current.get('data').iteritems():
-                    _list = type(value) == list
-                    if key == "duration":
-                        import time
-                        value += time.time()
-                        value = get_duration_string(value)
-                    set_config('current', key, value, _list=_list)
-                describe('current')
-            else:
-                print "No timer currently running."
+    if kwargs.get('previous'):
+        config_section = get_config('global', 'previous')
+    elif kwargs.get('current'):
+        current = get_current_timer()
+        if current.get('data'):
+            for key, value in current.get('data').iteritems():
+                _list = type(value) == list
+                if key == "duration":
+                    import time
+                    value += time.time()
+                    value = get_duration_string(value)
+                set_config('current', key, value, _list=_list)
+            describe('current')
+        else:
+            print "No timer currently running."
+    elif kwargs.get('this'):
+        config_section = get_branch_name()
     elif not config_section:
-        print "Must either provide a timer reference."
+        print "Must provide a timer reference."
     if config_section and config().has_section(config_section):
         describe(config_section)
     elif config_section:
         print "No timer configuration under '{ref}'.".format(ref=config_section)
 
 def describe(section):
-    items = config().items(section)
-    for option, value in items:
+    items = [("section", section)]
+    other_items = config().items(section)
+    for option, value in items + other_items:
         print "{opt}: {val}".format(opt=option.capitalize(), val=value.replace('::', ', '))
     
 def do_argparse():
@@ -328,12 +335,8 @@ def do_argparse():
     
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
-    if nice_kwargs.get('name') == "previous":
-        nice_kwargs['previous'] = True
-        del nice_kwargs['name']
-    elif nice_kwargs.get('name') == 'current':
-        nice_kwargs['current'] = True
-        del nice_kwargs['name']
+    for keyword in ('current', 'previous', 'this'):
+        nice_kwargs[keyword] = nice_kwargs.get('name') == keyword
     return nice_args, nice_kwargs
     
 if __name__ == "__main__":
