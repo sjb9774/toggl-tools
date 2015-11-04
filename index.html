@@ -1,9 +1,29 @@
 <!DOCTYPE html5>
 <head>
-  <link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Work+Sans:400,300,500' rel='stylesheet' type='text/css'>
   <link href='home.css' rel='stylesheet' type='text/css'>
 </head>
 <body>
-  <h3>This is sjb9774's page for toggl tools.</h3>
-  <p>It's still under development, so for now just use the <a href="https://github.com/sjb9774/toggl-tools/blob/master/README.md">README</a> to learn all the cool and good things you can do.</p>
+    <div class="content-wrapper">
+        <div class="banner-wrapper">
+            <h1 id="hello">toggl-tools</h1>
+        </div>
+        <div class="body-wrapper">
+            <div class="info-wrapper">
+                <p class="info emphasis">toggl-tools is a command line tool for using toggl that focuses on simplicity, utility, and productivity.</p>
+                <p class="info">The workflow is simple and unobstrusive</p>
+            </div>
+            
+            <div class="console">
+                <p>user@computer(master)~$ <span class="highlight">toggl-setup</span> this --project "Research"</p> 
+                <p>user@computer(master)~$ <span class="highlight">toggl</span> start this</p>
+                <p>Tracking "master" entry.</p>
+                <p>user@computer(master)~$ <span class="highlight">git</span> checkout other_branch</p>
+                <p>user@computer(other_branch)~$ <span class="highlight">toggl</span> stop</p>
+                <p>Stopped tracking "master".</p>
+                <p>user@computer(other_branch)~$ <span class="highlight">toggl</span> start this</p>
+                <p>Tracking "other-branch" entry.</p>
+            </div>
+        </div>
+    <div>
 </body>
