@@ -182,7 +182,7 @@ def start_timer(name="",
             }
         }
         
-        payload['time_entry']['billable'] = billable
+        payload['time_entry']['billable'] = bool(billable)
         if tags:
             payload['time_entry']['tags'] = tags
         if project_id:
@@ -292,6 +292,7 @@ def describe_command(*args, **kwargs):
     elif kwargs.get('current'):
         current = get_current_timer()
         if current.get('data'):
+            clear_config(section="current")
             for key, value in current.get('data').iteritems():
                 _list = type(value) == list
                 if key == "duration":
