@@ -4,7 +4,7 @@ body {
 }
 
 #hello {
-    margin: 50px;
+    margin: 0px 50px 50px 50px;
     text-align: center;
     font-weight: 600;
     font-size: 82px;
@@ -43,6 +43,7 @@ body {
 }
 
 .banner-wrapper {
+    height: 105px;
     padding: 25px;
     background-color: #374350;
     margin: 0px;
