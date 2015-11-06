@@ -29,7 +29,7 @@ def set_config(section, key, value, _list=False):
         cfg.set(section, key, '::'.join(value))
     else:
         cfg.set(section, key, value)
-    cfg.write(open(config_path(), 'r+'))
+    cfg.write(open(config_path(), 'w+'))
 
 def write_data(section, write_this):
     current_data = read_data()
@@ -156,12 +156,28 @@ def delete_timer(timer_id):
 def get_duration_string(seconds):
     mins, sec = divmod(seconds, 60)
     hrs, mins = divmod(mins, 60)
-    return "{hrs} hours, {mins} minutes, {secs} seconds.".format(hrs=int(hrs), mins=int(mins), secs=int(sec))
+    return "{hrs} hours, {mins} minutes, {secs} seconds".format(hrs=int(hrs), mins=int(mins), secs=int(sec))
 
 def stop_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}/stop".format(time_entry_id=timer_id)
     r = requests.put(url, auth=(get_api_token(), 'api_token'))
     return r.json()
+    
+def fetch_current(section="current"):
+    """Gets the currently running timer and stores it in the config in the given
+    section"""
+    current = get_current_timer()
+    if current.get('data'):
+        clear_config(section=section)
+        for key, value in current.get('data').iteritems():
+            _list = type(value) == list
+            if key == "duration":
+                import time
+                value += time.time()
+                value = get_duration_string(value)
+            set_config(section, key, value, _list=_list)
+        return True
+    return False
     
 def start_timer(name="", 
                 tags=None, 
@@ -197,6 +213,7 @@ def start_timer(name="",
         return r.json()
                     
 def start_command(delete=False, **kwargs):
+    set_config('paused', 'fresh', 'no')
     section = kwargs.get('name')
     for keyword in ('current', 'previous', 'this'):
         if kwargs.get(keyword):
@@ -268,6 +285,7 @@ def start_command(delete=False, **kwargs):
         print "Unknown problem starting the timer."
         
 def stop_command(*args, **kwargs):
+    set_config('paused', 'fresh', 'no')
     current_timer = get_current_timer()
     if current_timer['data']:
         data = stop_timer(current_timer['data']['id'])['data']
@@ -290,16 +308,7 @@ def describe_command(*args, **kwargs):
     if kwargs.get('previous'):
         config_section = get_config('global', 'previous')
     elif kwargs.get('current'):
-        current = get_current_timer()
-        if current.get('data'):
-            clear_config(section="current")
-            for key, value in current.get('data').iteritems():
-                _list = type(value) == list
-                if key == "duration":
-                    import time
-                    value += time.time()
-                    value = get_duration_string(value)
-                set_config('current', key, value, _list=_list)
+        if fetch_current():
             config_section = "current"
         else:
             print "No timer currently running."
@@ -319,6 +328,39 @@ def describe(section):
     other_items = config().items(section)
     for option, value in items + other_items:
         print "{opt}: {val}".format(opt=option.capitalize(), val=value.replace('::', ', '))
+        
+def pause_command(*args, **kwargs):
+    if not fetch_current(section="paused"):
+        print "No timer currently running, can't pause."
+    else:
+        current_timer_id = get_config("paused", "id")
+        set_config("paused", "fresh", "yes")
+        resp = stop_timer(current_timer_id)
+        if not resp.get('data'):
+            print "Couldn't stop the current timer for some reason. v(o_o)v"
+        else:
+            print "Paused '{name}' at {dur}. Resume this timer with toggl resume.".format(name=resp['data']['description'], 
+                                                                                         dur=get_duration_string(resp['data']['duration']))
+
+def resume_command(*args, **kwargs):
+    if get_config('paused', 'fresh') == "yes":
+        name = get_config('paused', 'description')
+        task_id = get_config('paused', 'tid')
+        workspace_id = get_config('paused', 'wid')
+        tags = get_config('paused', 'tags', _list=True)
+        project_id = get_config('paused', 'pid')
+        billable = get_config('paused', 'billable') or False
+        resp = start_timer(name=name,
+                           task_id=task_id,
+                           workspace_id=workspace_id,
+                           tags=tags,
+                           project_id=project_id,
+                           billable=billable)
+        if resp.get('data'):
+            print "Resumed timer '{name}'.".format(name=get_config('paused', 'description'))
+    else:
+        print "No currently paused timer."
+    
     
 def do_argparse():
     p = ArgumentParser(description="Starts or stops your toggl timer.")
@@ -333,6 +375,10 @@ def do_argparse():
     describe_parser.set_defaults(func=describe_command)
     start_parser.add_argument("name", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
     start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
+    pause_parser = p_subs.add_parser("pause", help="Pause the currently running timer such that you can start it again with 'resume'.")
+    pause_parser.set_defaults(func=pause_command)
+    resume_parser = p_subs.add_parser("resume", help="Resume a paused timer.")
+    resume_parser.set_defaults(func=resume_command)
     
     args = p.parse_args()
     
