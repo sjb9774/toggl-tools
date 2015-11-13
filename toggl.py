@@ -18,6 +18,9 @@ def config():
     cfg.read(config_path())
     return cfg
     
+def write_out(cfg):
+    cfg.write(open(config_path(), 'w+'))
+    
 def get_branch_name():
     return sh.git('rev-parse', '--abbrev-ref', 'HEAD').strip('\n').replace('_', '-')
     
@@ -29,7 +32,7 @@ def set_config(section, key, value, _list=False):
         cfg.set(section, key, '::'.join(value))
     else:
         cfg.set(section, key, value)
-    cfg.write(open(config_path(), 'w+'))
+    write_out(cfg)
 
 def write_data(section, write_this):
     current_data = read_data()
@@ -147,6 +150,7 @@ def clear_config(section=None):
     else:
         for section in cfg.sections():
             cfg.remove_section(section)
+    write_out(cfg)
     
 def delete_timer(timer_id):
     url = "https://www.toggl.com/api/v8/time_entries/{time_entry_id}".format(time_entry_id=timer_id)
