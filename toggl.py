@@ -360,6 +360,89 @@ def resume_command(*args, **kwargs):
             print "Resumed timer '{name}'.".format(name=get_config('paused', 'description'))
     else:
         print "No currently paused timer."
+
+
+from collections import namedtuple
+Result = namedtuple("Result", ["success", "response"])
+
+
+class Timer(object):
+    
+    __field_map__ = {
+        "id": "id",
+        "name": "entry",
+        "project": "pid",
+        "task": "tid",
+        "tags": "tags",
+        "workspace": "wid",
+        "billable": "billable"
+    }
+    
+    def __init__(self, section, id=None, name=None, project=None, task=None, workspace=None, billable=False, tags=None):
+        self.section, self.id, self.name, self.project,\
+        self.task, self.workspace, self.billable, self.tags = section, id, name, project, task, workspace, billable, tags
+        
+    def start(self):
+        response = start_timer(**self._get_timer_kwargs())
+        success = bool(response.get("data"))
+        if success:
+            self.id = reponse['data']['id']
+            # I *think* we should write all the data of this timer after a successful timer start
+            # to keep the config data consistent with the object
+            self.write(clear=True)
+        return Result(success=success, response=response.get('data'))    
+        
+    def stop(self):
+        if self.id:
+            response = stop_timer(self.id)
+            return Result(success=bool(response.get("data")), response=response.get('data'))
+        else:
+            raise ValueError("{this} has no id associated with it. Most likely this timer has not been started yet.".format(this=repr(self)))
+            return Result(success=False, response={})
+        
+    def describe(self):
+        describe(self.section)
+            
+    def write(self, clear=False):
+        cfg = config()
+        if not cfg.has_section(self.section):
+            cfg.add_section(self.section)
+        elif clear:
+            cfg.clear_section(self.section)
+        for field in self.__field_map__:
+            if hasattr(self, field):
+                set_config(self.section, self.__field_map__[field], getattr(self, field))
+        
+    @classmethod
+    def read(cls, section):
+        if config().has_section(section):
+            t = Timer(section)
+            t._refresh_config()
+            return t
+        else:
+            raise ValueError("There is no '{section}' config section.".format(section=section))
+            
+    def _get_timer_kwargs(self, refresh=True):
+        if refresh:
+            self._refresh_config()
+        return {
+            "name": self.name,
+            "task_id": self.task,
+            "project_id": self.project,
+            "tags": self.tags,
+            "billable": self.billable,
+            "workspace_id": self.workspace,
+        }
+        
+    def _refresh_config(self):
+        section = self.section
+        self.name = get_config(section, 'entry')
+        self.id = get_config(section, 'id')
+        self.task = get_config(section, 'tid')
+        self.workspace = get_config(section, 'wid')
+        self.tags = get_config(section, 'tags', _list=True)
+        self.project = get_config(section, 'pid')
+        self.billable = get_config(section, 'billable') or False
     
     
 def do_argparse():
