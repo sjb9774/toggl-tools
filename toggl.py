@@ -9,6 +9,8 @@ import time
 from ConfigParser import ConfigParser
 requests.packages.urllib3.disable_warnings()
 
+KEYWORDS = ("previous", "current", "this", "global", "paused")
+
 def config_path():
     import os
     return os.path.expanduser('~/.toggl/toggl.cfg')
@@ -364,6 +366,16 @@ def resume_command(*args, **kwargs):
             print "Resumed timer '{name}'.".format(name=get_config('paused', 'description'))
     else:
         print "No currently paused timer."
+        
+def list_command(*args, **kwargs):
+    cfg = config()
+    for section in cfg.sections():
+        if section not in KEYWORDS:
+            print section
+            if kwargs.get('verbose'):
+                print '------------------'
+                describe(section)
+                print '\n\n'
     
     
 def do_argparse():
@@ -371,24 +383,33 @@ def do_argparse():
     p_subs = p.add_subparsers()
     start_parser = p_subs.add_parser("start", help="Start a timer based on your current configuration.")
     start_parser.set_defaults(func=start_command)
+    
     stop_parser = p_subs.add_parser("stop", help="Stop the current timer.")
     stop_parser.set_defaults(func=stop_command)
     stop_parser.add_argument("--delete", action="store_true", help="Stops and deletes the current entry.")
+    
     describe_parser = p_subs.add_parser("describe", help="Outputs the configuration for the given timer.")
     describe_parser.add_argument('name', nargs='?', action="store", help="The name under which the desired configuration was saved.")
     describe_parser.set_defaults(func=describe_command)
+    
     start_parser.add_argument("name", metavar='config', action="store", help="If provided, the name of the entry configuration to start a timer with. Otherwise, looks for default settings.", nargs="?")
     start_parser.add_argument("--delete", action="store_true", help="Deletes the current entry and starts a new one with the current config.")
+    
     pause_parser = p_subs.add_parser("pause", help="Pause the currently running timer such that you can start it again with 'resume'.")
     pause_parser.set_defaults(func=pause_command)
+    
     resume_parser = p_subs.add_parser("resume", help="Resume a paused timer.")
     resume_parser.set_defaults(func=resume_command)
+    
+    list_parser = p_subs.add_parser("list", help="Outputs all the available configuration keys.")
+    list_parser.add_argument("-v", "--verbose", action="store_true", help="Describes each entry in detail.")
+    list_parser.set_defaults(func=list_command)
     
     args = p.parse_args()
     
     nice_args = list(args._get_args())
     nice_kwargs = dict(args._get_kwargs())
-    for keyword in ('current', 'previous', 'this'):
+    for keyword in KEYWORDS:
         nice_kwargs[keyword] = nice_kwargs.get('name') == keyword
     return nice_args, nice_kwargs
     
