@@ -87,6 +87,6 @@ if __name__ == "__main__":
         if args.project:
             set_config(section, 'project', args.project)
         if args.tags:
-            set_config(section, 'tags', tags, _list=True)
+            set_config(section, 'tags', args.tags, _list=True)
             
     print "You're configured! Start a timer by running toggl start, stop with toggl stop."
